@@ -39,7 +39,8 @@ setup(
     tests_require=['pytest'],
     install_requires=[
         'PyDictionary',
-        'pypiwin32'
+        'pypiwin32',
+        'six',
     ],
     cmdclass={'test': PyTest},
     description='Program to do spelling test',

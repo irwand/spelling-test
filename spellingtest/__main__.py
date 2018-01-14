@@ -6,6 +6,7 @@ import tkinter
 from tkinter.filedialog import askopenfilename
 
 import PyDictionary
+from six.moves import input
 import win32com.client
 
 
