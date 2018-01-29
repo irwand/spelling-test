@@ -91,14 +91,15 @@ def main(argv=None):
                     definition = None
                     say_with_rate(speak, voices[options.voiceindex], options.defrate, "no other meaning")
             elif typed == 'q':
-                got_wrong.setdefault(word, 1)
+                got_wrong.setdefault(word, [])
+                got_wrong[word].append('q')
                 break
             elif typed == 'w':
                 voiceindex += 1
             else:
-                got_wrong.setdefault(word, 0)
-                got_wrong[word] += 1
-                if got_wrong[word] >= options.maxtry:
+                got_wrong.setdefault(word, [])
+                got_wrong[word].append(typed)
+                if len(got_wrong[word]) >= options.maxtry:
                     print('wrong, the word is {}'.format(word))
                     break
                 print('wrong, try again')
@@ -109,7 +110,7 @@ def main(argv=None):
     if got_wrong:
         print("These are the words you got wrong:")
         for k in sorted(got_wrong.keys()):
-            print(k)
+            print('{} - typed {}'.format(k, str(got_wrong[k])))
         print("You got {:.1f}% of {} words".format(
             (1 - (len(got_wrong.keys()) * 1.0 / numwords)) * 100.0,
             numwords))
