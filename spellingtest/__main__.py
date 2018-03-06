@@ -1,4 +1,5 @@
 import argparse
+import os.path
 import random
 import sys
 import textwrap
@@ -51,6 +52,9 @@ def main(argv=None):
     parser.add_argument("--wordrate", type=int, default=-2, help="voice index")
     parser.add_argument("--defrate", type=int, default=0, help="voice index")
     parser.add_argument("--maxtry", type=int, default=3, help="max try")
+    parser.add_argument("--missed-file",
+                        help="File name to be appended with missed words. The file must already exist."
+                        "By default it's _missed.txt file in the same directory as the wordlist file.")
     options = parser.parse_args(argv)
 
     if not options.wordlist:
@@ -114,6 +118,13 @@ def main(argv=None):
         print("You got {:.1f}% of {} words".format(
             (1 - (len(got_wrong.keys()) * 1.0 / numwords)) * 100.0,
             numwords))
+
+        if options.missed_file is None:
+            missed_file = os.path.join(os.path.dirname(options.wordlist), '_missed.txt')
+        if os.path.exists(missed_file):
+            with open(missed_file, 'a') as f:
+                for k in sorted(got_wrong.keys()):
+                    f.write(k + '\n')
     else:
         print("Congratulations! You got 100% from {} words".format(numwords))
 
