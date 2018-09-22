@@ -35,6 +35,8 @@ The code is freely available at https://github.com/irwand/spelling-test
 
 1. pip install pyinstaller
 2. pyinstaller --onefile spellingtest\\\_\_main\_\_.py
-3. fix up pyinstaller with filedialog module: Edit \_\_main\_\_.spec file,
+3. fix up pyinstaller with filedialog module: edit \_\_main\_\_.spec file,
    hiddenimports should have ['tkinter', 'tkinter.filedialog']
-4. pyinstaller --onefile spellingtest\\\_\_main\_\_.spec
+4. fix name of the exe: edit \_\_main\_\_.spec file, and change exe name to
+   spellingtest
+5. pyinstaller --onefile spellingtest\\\_\_main\_\_.spec
