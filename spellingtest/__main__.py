@@ -3,11 +3,11 @@ import os.path
 import random
 import sys
 import textwrap
-import tkinter
-from tkinter.filedialog import askopenfilename
 
 import PyDictionary
 from six.moves import input
+from six.moves import tkinter
+from six.moves import tkinter_filedialog
 import win32com.client
 
 
@@ -60,12 +60,12 @@ def main(argv=None):
     if not options.wordlist:
         tkgui = tkinter.Tk()
         tkgui.withdraw()
-        options.wordlist = askopenfilename(title='Choose a wordlist file')
+        options.wordlist = tkinter_filedialog.askopenfilename(title='Choose a wordlist file')
         tkgui.update()
         tkgui.destroy()
 
     with open(options.wordlist) as f:
-        words = [w.strip() for w in f.readlines()]
+        words = [w.strip() for w in f.readlines() if w.strip()]
 
     random.shuffle(words)
 
