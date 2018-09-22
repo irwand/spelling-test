@@ -1,6 +1,10 @@
 # spelling-test
 
-This program is to test student spelling skill.
+This program is to test student spelling skill. When the program starts, it
+will ask for a word list file, which is a file that simply contains a list of
+words, one word per line. The program then randomizes the words and pronounces
+each word, as the user types the word. The program then checks spelling
+correctness.
 
 This currently only works for Windows 10, simply because we're using Microsoft
 speech engine.
