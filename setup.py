@@ -1,12 +1,13 @@
 from __future__ import print_function
-from setuptools import setup, find_packages
-from setuptools.command.test import test as TestCommand
 import io
-import codecs
 import os
 import sys
 
+from setuptools import setup
+from setuptools.command.test import test as TestCommand
+
 here = os.path.abspath(os.path.dirname(__file__))
+
 
 def read(*filenames, **kwargs):
     encoding = kwargs.get('encoding', 'utf-8')
@@ -18,6 +19,7 @@ def read(*filenames, **kwargs):
     return sep.join(buf)
 
 long_description = read('README.md')
+
 
 class PyTest(TestCommand):
     def finalize_options(self):
@@ -41,6 +43,7 @@ setup(
         'PyDictionary',
         'pypiwin32',
         'six',
+        'requests',
     ],
     cmdclass={'test': PyTest},
     description='Program to do spelling test',
@@ -48,7 +51,7 @@ setup(
     packages=['spellingtest'],
     include_package_data=True,
     platforms='any',
-    classifiers = [
+    classifiers=[
         'Programming Language :: Python',
         'Development Status :: 4 - Beta',
         'Natural Language :: English',
@@ -57,7 +60,7 @@ setup(
         'License :: OSI Approved :: GPL v3',
         'Operating System :: Windows 10',
         'Topic :: Software Development :: Program :: Python Modules',
-        ],
+    ],
     extras_require={
         'testing': ['pytest'],
     },

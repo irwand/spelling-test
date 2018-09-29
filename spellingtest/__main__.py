@@ -1,6 +1,8 @@
 import argparse
 import os.path
 import random
+import re
+import requests
 import sys
 import textwrap
 
@@ -26,6 +28,16 @@ def get_def(dictionary, word):
             yield "{}, {}".format(k, i)
 
 
+def get_example(examples, word):
+    url = 'http://sentence.yourdictionary.com/'
+    r = requests.get(url + word)
+    if r.status_code != 200:
+        return
+    matches = re.findall(r'class=\'li_content\'>(.+?)</div>', r.text)
+    for m in matches:
+        yield re.sub(r'<.+?>', '', m)
+
+
 def get_word_or_command(count, total):
     while True:
         typed = input('({}/{}) Type word or <Enter> for help> '.format(count, total))
@@ -35,6 +47,7 @@ def get_word_or_command(count, total):
                 Please type the word or one of these commands:
                 'w' to say the word again, in different voice,
                 'd' to say the next definition from the dictionary,
+                'e' to say the next example usage sentence,
                 'q' to quit."""))
         else:
             break
@@ -83,6 +96,7 @@ def main(argv=None):
     numwords = 0
     for word in words:
         definition = None
+        examples = None
         numwords += 1
         while True:
             say_with_rate(speak, voices[voiceindex % len(voices)], options.wordrate, word)
@@ -99,6 +113,14 @@ def main(argv=None):
                 except StopIteration:
                     definition = None
                     say_with_rate(speak, voices[options.voiceindex], options.defrate, "no other meaning")
+            elif typed == 'e':
+                if examples is None:
+                    examples = get_example(dictionary, word)
+                try:
+                    say_with_rate(speak, voices[options.voiceindex], options.defrate, next(examples))
+                except StopIteration:
+                    examples = None
+                    say_with_rate(speak, voices[options.voiceindex], options.defrate, "no other examples")
             elif typed == 'q':
                 got_wrong.setdefault(word, [])
                 got_wrong[word].append('q')

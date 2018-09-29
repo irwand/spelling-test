@@ -30,6 +30,9 @@ The code is freely available at https://github.com/irwand/spelling-test
 2. Fix up PyDictionary warning. Edit
    venv\Lib\site-packages\PyDictionary\utils.py. Add ', features="html.parser"'
    into BeautifulSoup constructor argument.
+3. Fix PyDictionary debug print when it can't find any meaning. Edit
+   venv\Lib\site-packages\PyDictionary\core.py. In meaning(term) function,
+   change print("Error: The Following Error occured:...) to a pass to disable the print.
 
 ## Build exe
 
