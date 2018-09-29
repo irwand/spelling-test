@@ -26,9 +26,9 @@ def get_def(dictionary, word):
             yield "{}, {}".format(k, i)
 
 
-def get_word_or_command():
+def get_word_or_command(count, total):
     while True:
-        typed = input('Type word or <Enter> for help> ')
+        typed = input('({}/{}) Type word or <Enter> for help> '.format(count, total))
         typed = typed.strip()
         if typed == '':
             print(textwrap.dedent("""\
@@ -46,26 +46,29 @@ def main(argv=None):
         argv = sys.argv[1:]
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("wordlist", default='', nargs='?',
-                        help="wordlist file, containing the list of words. One word per-line")
+    parser.add_argument("wordlist", default='', nargs='*',
+                        help="wordlist file(s), each containing the list of words. One word per-line")
     parser.add_argument("--voiceindex", type=int, default=0, help="voice index")
     parser.add_argument("--wordrate", type=int, default=-2, help="voice index")
     parser.add_argument("--defrate", type=int, default=0, help="voice index")
     parser.add_argument("--maxtry", type=int, default=3, help="max try")
     parser.add_argument("--missed-file",
                         help="File name to be appended with missed words. The file must already exist."
-                        "By default it's _missed.txt file in the same directory as the wordlist file.")
+                        "By default it's _missed.txt file in the same directory as the first wordlist file.")
     options = parser.parse_args(argv)
 
     if not options.wordlist:
         tkgui = tkinter.Tk()
         tkgui.withdraw()
-        options.wordlist = tkinter_filedialog.askopenfilename(title='Choose a wordlist file')
+        options.wordlist = [tkinter_filedialog.askopenfilename(title='Choose a wordlist file')]
         tkgui.update()
         tkgui.destroy()
 
-    with open(options.wordlist) as f:
-        words = [w.strip() for w in f.readlines() if w.strip()]
+    words = []
+    for wl in options.wordlist:
+        with open(wl) as f:
+            words.extend([w.strip() for w in f.readlines() if w.strip()])
+    words = list(set(words))  # uniquify
 
     random.shuffle(words)
 
@@ -74,14 +77,16 @@ def main(argv=None):
 
     dictionary = PyDictionary.PyDictionary()
 
+    print('Total number of words: {}'.format(len(words)))
     got_wrong = {}
     voiceindex = options.voiceindex
     numwords = 0
     for word in words:
         definition = None
+        numwords += 1
         while True:
             say_with_rate(speak, voices[voiceindex % len(voices)], options.wordrate, word)
-            typed = get_word_or_command()
+            typed = get_word_or_command(numwords, len(words))
             if typed == word:
                 print('correct')
                 voiceindex = options.voiceindex
@@ -107,7 +112,6 @@ def main(argv=None):
                     print('wrong, the word is {}'.format(word))
                     break
                 print('wrong, try again')
-        numwords += 1
         if typed == 'q':
             break
 
@@ -120,7 +124,7 @@ def main(argv=None):
             numwords))
 
         if options.missed_file is None:
-            missed_file = os.path.join(os.path.dirname(options.wordlist), '_missed.txt')
+            missed_file = os.path.join(os.path.dirname(options.wordlist[0]), '_missed.txt')
         if os.path.exists(missed_file):
             with open(missed_file, 'a') as f:
                 for k in sorted(got_wrong.keys()):
