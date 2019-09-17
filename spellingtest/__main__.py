@@ -80,7 +80,7 @@ def main(argv=None):
     words = []
     for wl in options.wordlist:
         with open(wl) as f:
-            words.extend([w.strip() for w in f.readlines() if w.strip()])
+            words.extend([w.strip().lower() for w in f.readlines() if w.strip()])
     words = list(set(words))  # uniquify
 
     random.shuffle(words)
