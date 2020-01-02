@@ -51,7 +51,7 @@ def get_word_or_command(count, total):
                 'q' to quit."""))
         else:
             break
-    return typed
+    return typed.lower()
 
 
 def main(argv=None):
