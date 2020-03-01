@@ -1,16 +1,18 @@
 import argparse
 import os.path
+import pathlib
 import random
 import re
-import requests
 import sys
 import textwrap
+import winsound
 
 import PyDictionary
+import requests
+import win32com.client
 from six.moves import input
 from six.moves import tkinter
 from six.moves import tkinter_filedialog
-import win32com.client
 
 
 def say_with_rate(speak, voice, rate, phrase):
@@ -19,13 +21,29 @@ def say_with_rate(speak, voice, rate, phrase):
     speak.Speak(phrase)
 
 
-def get_def(dictionary, word):
-    o = dictionary.meaning(word)
-    if not o:
-        return
-    for k, v in o.items():
-        for i in v:
-            yield "{}, {}".format(k, i)
+def get_word_data(word, dict_apikey):
+    url = f"https://www.dictionaryapi.com/api/v3/references/collegiate/json/{word}?key={dict_apikey}"  # noqa
+    r = requests.get(url)
+    if r.status_code != 200:
+        raise ValueError("Can't find word from dictionary")
+
+    word_data = r.json()
+
+    try:
+        prs = word_data[0]["hwi"]["prs"]
+        for i in prs:
+            if "sound" in i:
+                wav_file = i["sound"]["audio"]
+    except Exception:
+        print(f"Can't find wav_file on {word_data}")
+        raise
+
+    pronounce_url = f"https://media.merriam-webster.com/soundc11/{wav_file[0]}/{wav_file}.wav"
+    r = requests.get(pronounce_url)
+    if r.status_code != 200:
+        raise ValueError("Can't find pronounciation on {word_data}")
+    pronounce = r.content
+    return (word_data, pronounce)
 
 
 def get_example(examples, word):
@@ -48,13 +66,42 @@ def get_word_or_command(count, total):
                 'w' to say the word again, in different voice,
                 'd' to say the next definition from the dictionary,
                 'e' to say the next example usage sentence,
-                'q' to quit."""))
+                'g' to give up on this word,
+                'q' to quit."""))  # noqa
+        elif typed == 'q':
+            confirm = input("Are you sure?")
+            if confirm.strip().lower() in ["y", "yes"]:
+                break
         else:
             break
     return typed.lower()
 
 
+def get_dict_apikey():
+    apikeyfile = "dict_api.key"
+    dict_apikey_path = pathlib.Path.cwd() / apikeyfile
+    if dict_apikey_path.exists():
+        return dict_apikey_path.read_text().strip()
+
+    dict_apikey_path = pathlib.Path(sys.executable).parent / apikeyfile
+    if dict_apikey_path.exists():
+        return dict_apikey_path.read_text().strip()
+
+    dict_apikey_path = pathlib.Path(sys.argv[0]).parent / apikeyfile
+    if dict_apikey_path.exists():
+        return dict_apikey_path.read_text().strip()
+
+    home = pathlib.Path(os.path.expanduser("~"))
+    dict_apikey_path = home / apikeyfile
+    if dict_apikey_path.exists():
+        return dict_apikey_path.read_text().strip()
+
+    raise ValueError(f"could not find {apikeyfile}")
+
+
 def main(argv=None):
+    dict_apikey = get_dict_apikey()
+
     if argv is None:
         argv = sys.argv[1:]
 
@@ -65,7 +112,7 @@ def main(argv=None):
     parser.add_argument("--wordrate", type=int, default=-2, help="voice index")
     parser.add_argument("--defrate", type=int, default=0, help="voice index")
     parser.add_argument("--maxtry", type=int, default=3, help="max try")
-    parser.add_argument("--missed-file",
+    parser.add_argument("--missed-file", type=pathlib.Path,
                         help="File name to be appended with missed words. The file must already exist."
                         "By default it's _missed.txt file in the same directory as the first wordlist file.")
     options = parser.parse_args(argv)
@@ -95,19 +142,18 @@ def main(argv=None):
     voiceindex = options.voiceindex
     numwords = 0
     for word in words:
-        definition = None
+        (word_data, pronounce) = get_word_data(word, dict_apikey)
+        definition = (d for d in word_data[0]["shortdef"])
         examples = None
         numwords += 1
         while True:
-            say_with_rate(speak, voices[voiceindex % len(voices)], options.wordrate, word)
+            winsound.PlaySound(pronounce, winsound.SND_MEMORY)
             typed = get_word_or_command(numwords, len(words))
             if typed == word:
                 print('correct')
                 voiceindex = options.voiceindex
                 break
             elif typed == 'd':
-                if definition is None:
-                    definition = get_def(dictionary, word)
                 try:
                     say_with_rate(speak, voices[options.voiceindex], options.defrate, next(definition))
                 except StopIteration:
@@ -127,6 +173,11 @@ def main(argv=None):
                 break
             elif typed == 'w':
                 voiceindex += 1
+            elif typed == 'g':
+                got_wrong.setdefault(word, [])
+                got_wrong[word].append(typed)
+                print('the word is {}'.format(word))
+                break
             else:
                 got_wrong.setdefault(word, [])
                 got_wrong[word].append(typed)
@@ -146,9 +197,9 @@ def main(argv=None):
             numwords))
 
         if options.missed_file is None:
-            missed_file = os.path.join(os.path.dirname(options.wordlist[0]), '_missed.txt')
-        if os.path.exists(missed_file):
-            with open(missed_file, 'a') as f:
+            missed_file = pathlib.Path(options.wordlist[0]).parent / '_missed.txt'
+        if missed_file.exists():
+            with missed_file.open('a') as f:
                 for k in sorted(got_wrong.keys()):
                     f.write(k + '\n')
     else:

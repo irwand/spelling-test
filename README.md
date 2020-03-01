@@ -13,6 +13,13 @@ The code is freely available at https://github.com/irwand/spelling-test
 
 # Build
 
+NOTE: This code uses Merriam-Webster dictionary web-api, so you'll need to
+register at https://dictionaryapi.com/ and get your API key. Then create a file
+that contains the api-key, named "dict_api.key", and place it either in:
+* current-directory
+* same directory as the exe produced by pyinstaller
+* home-directory
+
 ## Download this code, create venv, install dependencies
 
 1. install Python 3.6
