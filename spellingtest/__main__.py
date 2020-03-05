@@ -5,20 +5,14 @@ import random
 import re
 import sys
 import textwrap
+import traceback
 import winsound
 
-import PyDictionary
 import requests
 import win32com.client
 from six.moves import input
 from six.moves import tkinter
 from six.moves import tkinter_filedialog
-
-
-def say_with_rate(speak, voice, rate, phrase):
-    speak.Rate = rate
-    speak.Voice = voice
-    speak.Speak(phrase)
 
 
 def get_word_data(word, dict_apikey):
@@ -28,30 +22,33 @@ def get_word_data(word, dict_apikey):
         raise ValueError("Can't find word from dictionary")
 
     word_data = r.json()
+    wav_files = []
+    wav_data = []
 
     try:
         prs = word_data[0]["hwi"]["prs"]
         for i in prs:
             if "sound" in i:
-                wav_file = i["sound"]["audio"]
+                wav_files.append(i["sound"]["audio"])
     except Exception:
         print(f"Can't find wav_file on {word_data}")
         raise
 
-    pronounce_url = f"https://media.merriam-webster.com/soundc11/{wav_file[0]}/{wav_file}.wav"
-    r = requests.get(pronounce_url)
-    if r.status_code != 200:
-        raise ValueError("Can't find pronounciation on {word_data}")
-    pronounce = r.content
-    return (word_data, pronounce)
+    for wav_file in wav_files:
+        pronounce_url = f"https://media.merriam-webster.com/soundc11/{wav_file[0]}/{wav_file}.wav"
+        r = requests.get(pronounce_url)
+        if r.status_code != 200:
+            raise ValueError("Can't find pronounciation on {word_data}")
+        wav_data.append(r.content)
+    return (word_data, wav_data)
 
 
-def get_example(examples, word):
+def get_example(word):
     url = 'http://sentence.yourdictionary.com/'
     r = requests.get(url + word)
     if r.status_code != 200:
         return
-    matches = re.findall(r'class=\'li_content\'>(.+?)</div>', r.text)
+    matches = re.findall(r'\\"sentence\\":\\"(.+?)\\"', r.text)
     for m in matches:
         yield re.sub(r'<.+?>', '', m)
 
@@ -69,7 +66,7 @@ def get_word_or_command(count, total):
                 'g' to give up on this word,
                 'q' to quit."""))  # noqa
         elif typed == 'q':
-            confirm = input("Are you sure?")
+            confirm = input("Are you sure? ")
             if confirm.strip().lower() in ["y", "yes"]:
                 break
         else:
@@ -99,6 +96,33 @@ def get_dict_apikey():
     raise ValueError(f"could not find {apikeyfile}")
 
 
+def _play_wav(wav_data, msspeech):
+    winsound.PlaySound(wav_data[0], winsound.SND_MEMORY)
+    for w in wav_data[1:]:
+        msspeech.say("or")
+        winsound.PlaySound(w, winsound.SND_MEMORY)
+
+
+def say_word(word, word_data, wav_data, msspeech):
+    if word == word_data[0]["meta"]["id"].split(":")[0]:  # exact pronunciation
+        _play_wav(wav_data, msspeech)
+    else:
+        msspeech.say(word)
+        msspeech.say("stems from")
+        _play_wav(wav_data, msspeech)
+
+
+class MSSpeech(object):
+    def __init__(self, rate):
+        self._speak = win32com.client.Dispatch("SAPI.SpVoice")
+        voices = [v for v in self._speak.GetVoices()]
+        self._speak.Rate = rate
+        self._speak.Voice = voices[0]
+
+    def say(self, phrase):
+        self._speak.Speak(phrase)
+
+
 def main(argv=None):
     dict_apikey = get_dict_apikey()
 
@@ -108,7 +132,6 @@ def main(argv=None):
     parser = argparse.ArgumentParser()
     parser.add_argument("wordlist", default='', nargs='*',
                         help="wordlist file(s), each containing the list of words. One word per-line")
-    parser.add_argument("--voiceindex", type=int, default=0, help="voice index")
     parser.add_argument("--wordrate", type=int, default=-2, help="voice index")
     parser.add_argument("--defrate", type=int, default=0, help="voice index")
     parser.add_argument("--maxtry", type=int, default=3, help="max try")
@@ -132,59 +155,61 @@ def main(argv=None):
 
     random.shuffle(words)
 
-    speak = win32com.client.Dispatch("SAPI.SpVoice")
-    voices = [v for v in speak.GetVoices()]
-
-    dictionary = PyDictionary.PyDictionary()
+    msspeech = MSSpeech(options.defrate)
 
     print('Total number of words: {}'.format(len(words)))
     got_wrong = {}
-    voiceindex = options.voiceindex
     numwords = 0
     for word in words:
-        (word_data, pronounce) = get_word_data(word, dict_apikey)
-        definition = (d for d in word_data[0]["shortdef"])
-        examples = None
-        numwords += 1
-        while True:
-            winsound.PlaySound(pronounce, winsound.SND_MEMORY)
-            typed = get_word_or_command(numwords, len(words))
-            if typed == word:
-                print('correct')
-                voiceindex = options.voiceindex
-                break
-            elif typed == 'd':
-                try:
-                    say_with_rate(speak, voices[options.voiceindex], options.defrate, next(definition))
-                except StopIteration:
-                    definition = None
-                    say_with_rate(speak, voices[options.voiceindex], options.defrate, "no other meaning")
-            elif typed == 'e':
-                if examples is None:
-                    examples = get_example(dictionary, word)
-                try:
-                    say_with_rate(speak, voices[options.voiceindex], options.defrate, next(examples))
-                except StopIteration:
-                    examples = None
-                    say_with_rate(speak, voices[options.voiceindex], options.defrate, "no other examples")
-            elif typed == 'q':
-                got_wrong.setdefault(word, [])
-                got_wrong[word].append('q')
-                break
-            elif typed == 'w':
-                voiceindex += 1
-            elif typed == 'g':
-                got_wrong.setdefault(word, [])
-                got_wrong[word].append(typed)
-                print('the word is {}'.format(word))
-                break
-            else:
-                got_wrong.setdefault(word, [])
-                got_wrong[word].append(typed)
-                if len(got_wrong[word]) >= options.maxtry:
-                    print('wrong, the word is {}'.format(word))
+        try:
+            (word_data, wav_data) = get_word_data(word, dict_apikey)
+            definition = (d for d in word_data[0]["shortdef"])
+            examples = None
+            numwords += 1
+            while True:
+                say_word(word, word_data, wav_data, msspeech)
+                typed = get_word_or_command(numwords, len(words))
+                if typed == word:
+                    print('correct')
                     break
-                print('wrong, try again')
+                elif typed == 'd':
+                    try:
+                        msspeech.say(next(definition))
+                    except StopIteration:
+                        definition = None
+                        msspeech.say("no other meaning")
+                elif typed == 'e':
+                    if examples is None:
+                        examples = get_example(word)
+                    try:
+                        msspeech.say(next(examples))
+                    except StopIteration:
+                        examples = None
+                        msspeech.say("no other examples")
+                elif typed == 'q':
+                    got_wrong.setdefault(word, [])
+                    got_wrong[word].append('q')
+                    break
+                elif typed == 'w':
+                    pass  # loop back, say the word again
+                elif typed == 'g':
+                    got_wrong.setdefault(word, [])
+                    got_wrong[word].append(typed)
+                    print('the word is {}'.format(word))
+                    break
+                else:
+                    got_wrong.setdefault(word, [])
+                    got_wrong[word].append(typed)
+                    if len(got_wrong[word]) >= options.maxtry:
+                        print('wrong, the word is {}'.format(word))
+                        break
+                    print('wrong, try again')
+        except Exception:
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            print(f"ERROR: Exception in processing word: {word}")
+            traceback.print_tb(exc_traceback)
+            # continue to next word
+
         if typed == 'q':
             break
 
